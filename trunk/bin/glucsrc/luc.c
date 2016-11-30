@@ -847,16 +847,18 @@ void LUCinitGrids()
     utilities_os = (float *)initGridMap(
                 SMEgetFileName("UTILITIES_OS_MAP"), elements, sizeof (float));
     utilities_tmp = (float *)initGridMap(NULL, elements, sizeof (float));
-    diffusion_rate = SMEgetFloat("U_DIFFUSE_RATE", 0.2);
+    
+    //diffusion_rate = SMEgetFloat("U_DIFFUSE_RATE", 0.2);
+
     //test diffusion rate
-    //diffusion_rate = SMEgetFloat("U_DIFFUSE_RATE", 0.0);
+    diffusion_rate = SMEgetFloat("U_DIFFUSE_RATE", 0.5);
     diffusion_res_flags = SMEgetInt("U_DIFFUSE_RES_FLAGS", RES_FLAG);
     diffusion_com_flags = SMEgetInt("U_DIFFUSE_COM_FLAGS", COM_FLAG);
     diffusion_os_flags = SMEgetInt("U_DIFFUSE_OS_FLAGS", OS_FLAG);
     diffusion_init_step = SMEgetInt("U_DIFFUSE_INITSTEPS", 10);
-    diffusion_rate_os = SMEgetFloat("DIFFUSION_RATE_OS", 0.2);
+    //diffusion_rate_os = SMEgetFloat("DIFFUSION_RATE_OS", 0.2);
     //test diffusion rate
-    //diffusion_rate_os = SMEgetFloat("DIFFUSION_RATE_OS", 0.0);
+    diffusion_rate_os = SMEgetFloat("DIFFUSION_RATE_OS", 0.5n);
     diffusion_steps_os = SMEgetInt("DIFFUSION_STEPS_OS", 3);
 
     /* set landuse data */

@@ -284,8 +284,16 @@ def cost2score(costname, scorename):
        @input: attractiveness map without _cost
        @output: result score map name
     """
+    # Scale score to 0--1
+    runlog.p("--generage %s" %scorename)
+    newCostName = costname + "_cost"
+    maxval = grass.raster_info(newCostName)['max']
+    runlog.p( "newCostName:" + newCostName + " maxval:" + str(maxval))
+    grass.mapcalc("%s_score = %s*0.1 / %f" %(scorename, newCostName, maxval))
+    """
     grass.run_command('r.recode', input=costname+'_cost', output=scorename+"_score", 
                                   rules="SFA/"+scorename+".sfa")
+    """
     # Setting to null so that there won't be weird values appear
     grass.run_command('r.null', map=scorename+"_score", null=0.0)
     return scorename+"_score"
@@ -298,16 +306,26 @@ def att2score_centers(attname, scorename):
     """
     # Print scorename to test file generation
     runlog.p("--generage %s" %scorename)
+    """
     grass.run_command('r.recode', input=attname+"_att", output=scorename+"_score", 
                                   rules="SFA/"+scorename+".sfa")
+    """
+    # Scale score to 0--1
     weight = WEIGHTS[scorename] 
+    newAttName = attname + "_att"
+    maxval = grass.raster_info(newAttName)['max']
+    runlog.p("newAttName:" + newAttName + "maxval:" + str(maxval))
+    grass.mapcalc("%s_score = (%s / %f) * %f" %(scorename, newAttName, maxval, weight))
+    
+    """
     grass.mapcalc('%s_score=pow(%s_score,%f)' %(scorename, scorename, weight))
+    """
     export_asciimap(scorename+"_score")
     exportAllforms(scorename+"_score", 'UInt16')
     return scorename+"_score"
 
 
-def genProbmap(centerscorelist, costscorelist, problayername, multiplier=100000):
+def genProbmap(centerscorelist, costscorelist, problayername, multiplier=100):
     """ From attrmaps to generate probmap.
         @input: centerscorelist is a list of (attname, scorename) pairs. 
                 E.g. centerscorelist can be:
@@ -321,14 +339,21 @@ def genProbmap(centerscorelist, costscorelist, problayername, multiplier=100000)
                  _percentage maps are probmap * 100 to have integer values to 
                  speed up showing on browser.
     """
+    runlog.p("--generate" + problayername)
     grass.mapcalc(problayername+'=1.0')
     for cost, score in costscorelist:
         score = cost2score(cost, score)
-        grass.mapcalc(problayername +'='+ problayername + '*' + score)
+        grass.mapcalc(problayername +'='+ problayername + '-' + score)
     for att, score in centerscorelist:
         score = att2score_centers(att, score)
-        grass.mapcalc(problayername +'='+ problayername + '*' + score) 
-    grass.mapcalc("%s_percentage = %s*%i" %(problayername, problayername, multiplier))    
+        grass.mapcalc(problayername +'='+ problayername + '+' + score) 
+
+    maxval = grass.raster_info(problayername)['max']
+    runlog.p(problayername + " maxval:" + str(maxval))
+    grass.mapcalc("%s = %s / %f" %(problayername, problayername, maxval))
+
+    runlog.p("--generate" + problayername +"_percentage")
+    grass.mapcalc("%s_percentage = %s*%i" %(problayername, problayername, multiplier))
     # embed nogrowth into prob maps 
     #runlog.p("--Embed nogrowth map into prob maps......")
     #grass.mapcalc("%s_percentage = not(if(%s))*(%s_percentage)" %(problayername, "nogrowth", problayername))
@@ -363,7 +388,7 @@ def gencentersAttmaps(empcenters, popcenters):
                "overlandTravelTime30, intTravelTime30, and population centers......")
     os.system("python bin/cities.py -p total_pop -n pop -m grav popcentersBase > Log/popatt.log")
     #Add this line in order to convert pop_att with sfa file because the pop_att are too small
-    grass.mapcalc("pop_att = pop_att * 10")
+    #grass.mapcalc("pop_att = pop_att * 10")
 
     exportAllforms("pop_att", 'UInt16', nomin=True)
 
@@ -388,11 +413,14 @@ def genOtherAttmaps():
     
     runlog.p("--generate intersection travel cost map......")
     intersectionTravelCost()
+    
     exportAllforms("intersect_cost", 'UInt16')
 
     runlog.p("--generate transport attraction map using statered_cost, "
                "county_cost, road_cost, ramp_cost, and intersect_cost......")
     transportAttraction()
+    # Narrow the value of transport attractions, enable it to combine with sfa file
+    #grass.mapcalc("transport_att = transport_att * 0.0001")
     exportAllforms("transport_att", 'UInt16', nomin=True)
     
     runlog.p("--generate water travelcost map......")
@@ -411,15 +439,15 @@ def genOtherAttmaps():
 def genProbmaps():
     runlog.p("--generate probmap_com, the probabiltiy map for commertial developement, "
                "and output probmap_com_percentage, where all values are 0.01 of probmap_com......")
-    genProbmap(COMSCORELIST, COSTSCORELIST, 'probmap_com', 10000000)# probcom has -07 values
+    genProbmap(COMSCORELIST, COSTSCORELIST, 'probmap_com')# probcom has -07 values
     exportRaster('probmap_com', 'Float32')
-    exportAllforms('probmap_com_percentage', nomin=True) 
+    exportAllforms('probmap_com_percentage', 'UInt16') 
 
     runlog.p("--generate probmap_res...the probabiltiy map for residential developement, "
              "and output probmap_res_percentage, where all values are 0.01 of probmap_res......")
-    genProbmap(RESSCORELIST, COSTSCORELIST, 'probmap_res', 100000)
+    genProbmap(RESSCORELIST, COSTSCORELIST, 'probmap_res')
     exportRaster('probmap_res', 'Float32')
-    exportAllforms('probmap_res_percentage', nomin=True)
+    exportAllforms('probmap_res_percentage', 'UInt16')
 
 def genScoreMaps():
     runlog.p("--generate score map......")

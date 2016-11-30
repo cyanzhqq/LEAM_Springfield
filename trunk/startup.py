@@ -551,7 +551,8 @@ def main():
         if not isprobmapcached:
             runlog.h('Building Probability Maps..............')
             runMulticostModel(resultsdir, site, runlog)
-            cacheProbmaps(luc.growthmap[0]['url'])            
+            #hide cache function temporarily 
+            #cacheProbmaps(luc.growthmap[0]['url'])            
 
     if luc.growthmap:
         runlog.h('Processing Growth Projection set........')
