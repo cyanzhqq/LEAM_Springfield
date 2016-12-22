@@ -53,8 +53,8 @@ def exportRaster(layername, valuetype='Float64', enlarge=False): #'UInt16'
     if grass.run_command('r.out.gdal', input=layername, 
       output=outfilename, type=valuetype, quiet=True):
         raise RuntimeError('unable to export raster map ' + layername )
-
-    return layername # in caseo enlarge == True, layername may be modified
+    runlog.p("--export Raster map")
+    return layername # in case of enlarge == True, layername may be modified
 
 
 def export_asciimap(layername, nullval=-1, integer=False):
@@ -287,16 +287,16 @@ def cost2score(costname, scorename):
     # Scale score to 0--1
     runlog.p("--generage %s" %scorename)
     newCostName = costname + "_cost"
+
     maxval = grass.raster_info(newCostName)['max']
     runlog.p( "newCostName:" + newCostName + " maxval:" + str(maxval))
-    grass.mapcalc("%s_score = %s*0.1 / %f" %(scorename, newCostName, maxval))
-    """
-    grass.run_command('r.recode', input=costname+'_cost', output=scorename+"_score", 
-                                  rules="SFA/"+scorename+".sfa")
-    """
+    grass.mapcalc("%s_score = %s * 0.1 / %f" %(newCostName, newCostName, maxval))
+
     # Setting to null so that there won't be weird values appear
-    grass.run_command('r.null', map=scorename+"_score", null=0.0)
-    return scorename+"_score"
+    grass.run_command('r.null', map=newCostName+"_score", null=0.0)
+    export_asciimap(newCostName+"_score")
+    exportAllforms(newCostName+"_score", 'UInt16')
+    return newCostName+"_score"
 
 
 def att2score_centers(attname, scorename):
@@ -306,10 +306,7 @@ def att2score_centers(attname, scorename):
     """
     # Print scorename to test file generation
     runlog.p("--generage %s" %scorename)
-    """
-    grass.run_command('r.recode', input=attname+"_att", output=scorename+"_score", 
-                                  rules="SFA/"+scorename+".sfa")
-    """
+
     # Scale score to 0--1
     weight = WEIGHTS[scorename] 
     newAttName = attname + "_att"
@@ -317,9 +314,6 @@ def att2score_centers(attname, scorename):
     runlog.p("newAttName:" + newAttName + "maxval:" + str(maxval))
     grass.mapcalc("%s_score = (%s / %f) * %f" %(scorename, newAttName, maxval, weight))
     
-    """
-    grass.mapcalc('%s_score=pow(%s_score,%f)' %(scorename, scorename, weight))
-    """
     export_asciimap(scorename+"_score")
     exportAllforms(scorename+"_score", 'UInt16')
     return scorename+"_score"
@@ -339,24 +333,27 @@ def genProbmap(centerscorelist, costscorelist, problayername, multiplier=100):
                  _percentage maps are probmap * 100 to have integer values to 
                  speed up showing on browser.
     """
-    runlog.p("--generate" + problayername)
+    runlog.p("--generate " + problayername)
     grass.mapcalc(problayername+'=1.0')
     for cost, score in costscorelist:
         score = cost2score(cost, score)
         grass.mapcalc(problayername +'='+ problayername + '-' + score)
+
+    runlog.p("--generate cost score")
     for att, score in centerscorelist:
         score = att2score_centers(att, score)
         grass.mapcalc(problayername +'='+ problayername + '+' + score) 
+    runlog.p("--generate att score")
 
     maxval = grass.raster_info(problayername)['max']
     runlog.p(problayername + " maxval:" + str(maxval))
     grass.mapcalc("%s = %s / %f" %(problayername, problayername, maxval))
+     
+    runlog.p("--generate percentage version of" + problayername)
+    grass.mapcalc("%s = %s*%i" %(problayername, problayername, multiplier))  # Test file name
+    # Hard code "21" in order to remvoe background color
+    grass.mapcalc("%s = %s - 21" %(problayername, problayername)) # Test file name
 
-    runlog.p("--generate" + problayername +"_percentage")
-    grass.mapcalc("%s_percentage = %s*%i" %(problayername, problayername, multiplier))
-    # embed nogrowth into prob maps 
-    #runlog.p("--Embed nogrowth map into prob maps......")
-    #grass.mapcalc("%s_percentage = not(if(%s))*(%s_percentage)" %(problayername, "nogrowth", problayername))
     grass.run_command('g.remove', rast=score)
 
 ##################### Main Functions to be called ######################
@@ -387,8 +384,7 @@ def gencentersAttmaps(empcenters, popcenters):
     runlog.p("--generate population centers attractive map using cross, "
                "overlandTravelTime30, intTravelTime30, and population centers......")
     os.system("python bin/cities.py -p total_pop -n pop -m grav popcentersBase > Log/popatt.log")
-    #Add this line in order to convert pop_att with sfa file because the pop_att are too small
-    #grass.mapcalc("pop_att = pop_att * 10")
+
 
     exportAllforms("pop_att", 'UInt16', nomin=True)
 
@@ -413,14 +409,11 @@ def genOtherAttmaps():
     
     runlog.p("--generate intersection travel cost map......")
     intersectionTravelCost()
-    
     exportAllforms("intersect_cost", 'UInt16')
 
     runlog.p("--generate transport attraction map using statered_cost, "
                "county_cost, road_cost, ramp_cost, and intersect_cost......")
     transportAttraction()
-    # Narrow the value of transport attractions, enable it to combine with sfa file
-    #grass.mapcalc("transport_att = transport_att * 0.0001")
     exportAllforms("transport_att", 'UInt16', nomin=True)
     
     runlog.p("--generate water travelcost map......")
@@ -441,25 +434,16 @@ def genProbmaps():
                "and output probmap_com_percentage, where all values are 0.01 of probmap_com......")
     genProbmap(COMSCORELIST, COSTSCORELIST, 'probmap_com')# probcom has -07 values
     exportRaster('probmap_com', 'Float32')
-    exportAllforms('probmap_com_percentage', 'UInt16') 
+    #exportAllforms('probmap_com_percentage', 'Float32', nomin=True) 
+    exportAllforms('probmap_com', 'Float32', nomin=True) 
 
     runlog.p("--generate probmap_res...the probabiltiy map for residential developement, "
              "and output probmap_res_percentage, where all values are 0.01 of probmap_res......")
     genProbmap(RESSCORELIST, COSTSCORELIST, 'probmap_res')
     exportRaster('probmap_res', 'Float32')
-    exportAllforms('probmap_res_percentage', 'UInt16')
+    #exportAllforms('probmap_res_percentage', 'Float32', nomin=True) 
+    exportAllforms('probmap_res', 'Float32', nomin=True)
 
-def genScoreMaps():
-    runlog.p("--generate score map......")
-    exportAllforms("pop_com_score", 'UInt16')
-    exportAllforms("pop_res_score", 'UInt16')
-    exportAllforms("emp_com_score", 'UInt16')
-    exportAllforms("emp_res_score", 'UInt16')
-    exportAllforms("transport_com_score", 'UInt16')
-    exportAllforms("transport_res_score", 'UInt16')
-    exportAllforms("water_score", 'UInt16')
-    exportAllforms("forest_score", 'UInt16')
-    exportAllforms("slope_score", 'UInt16')
 
 def runMulticostModel(resultsurl, website, log):
     global resultsdir
@@ -472,8 +456,9 @@ def runMulticostModel(resultsurl, website, log):
 
     gencentersAttmaps(EMPCENTERS, POPCENTERS)
     genOtherAttmaps()
+    
     genProbmaps()
-    #genScoreMaps()
+
 
 def main():
     sys.stdout = open('./Log/multicostModel.stdout.log', 'w')
