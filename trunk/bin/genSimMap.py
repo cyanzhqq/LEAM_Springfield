@@ -71,7 +71,7 @@ def getQuantileList(mapfilename, numbaskets, nomin=False, nomax=False, isuniq=Fa
     arr =  arr[arr>=0] # mapserver cannot recognize negatives
     basketsize = len(arr)/numbaskets
     sortedarr = np.sort(arr)
-
+    maxVal = sortedarr[-1] 
     # if the number of uniq values is less than 30, then return 
     # the uniq values directly. Thus, maps composed of only 0 and 1
     # can be colored without losing its base values.
@@ -80,10 +80,10 @@ def getQuantileList(mapfilename, numbaskets, nomin=False, nomax=False, isuniq=Fa
         if nomin:
             #print "minValue", uniqarr[0]
             #print "otherValue", uniqarr[1:]
-            return uniqarr[uniqarr!=uniqarr[0]], True
+            return uniqarr[uniqarr!=uniqarr[0]], True, maxVal
         if nomax:
-            return uniqarr[uniqarr!=uniqarr[-1]], True
-        return uniqarr, True # set isuniq to be true
+            return uniqarr[uniqarr!=uniqarr[-1]], True, maxVal
+        return uniqarr, True, maxVal # set isuniq to be true
 
     # if the maximum values has more than a quanter number of basketsize, 
     # 15 baskets may become [1, max, max, max, max] only
@@ -91,6 +91,7 @@ def getQuantileList(mapfilename, numbaskets, nomin=False, nomax=False, isuniq=Fa
     removemax = False
     if nomax or len(sortedarr[sortedarr == sortedarr[-1]]) > (numbaskets>>2)*basketsize:
         sortedarr = sortedarr[sortedarr!= sortedarr[-1]]
+        maxVal = sortedarr[-1]
         basketsize = len(sortedarr)/numbaskets
         removemax = True
 
@@ -99,7 +100,7 @@ def getQuantileList(mapfilename, numbaskets, nomin=False, nomax=False, isuniq=Fa
     # without intermediate values.
     removemin = False
     if nomin or len(sortedarr[sortedarr == sortedarr[0]]) > (numbaskets>>2)*basketsize:
-        sortedarr = sortedarr[sortedarr!=sortedarr[-1]]
+        sortedarr = sortedarr[sortedarr!=sortedarr[0]]
         basketsize = len(sortedarr)/numbaskets
         removemin = True
 
@@ -111,7 +112,8 @@ def getQuantileList(mapfilename, numbaskets, nomin=False, nomax=False, isuniq=Fa
     arrticks = np.unique(arrticks)
     print basketsize
     print arrticks
-    return list(arrticks), False # return isuniq to be False
+    print "maxVal:", maxVal
+    return list(arrticks), False, maxVal # return isuniq to be False
 
 def getRGBList(numbaskets):
     """Inteporlate colors for maximum values to minimum values
@@ -164,7 +166,7 @@ def genclassColorCondlist(filename, numbaskets, nomin=False, nomax=False, isuniq
     if (numbaskets < 2):
         print "Error: number of baskets is less than 2."
         exit(1)
-    quantilelist, isuniq = getQuantileList("./Data/%s.txt" % filename, numbaskets, nomin, nomax, isuniq)
+    quantilelist, isuniq, newMaxVal = getQuantileList("./Data/%s.txt" % filename, numbaskets, nomin, nomax, isuniq)
     if isuniq:
         numbaskets = len(quantilelist)
         classColorCondlist = []
@@ -183,12 +185,18 @@ def genclassColorCondlist(filename, numbaskets, nomin=False, nomax=False, isuniq
     if (numbaskets > 1):
         condstr = "[pixel] == "+str(quantilelist[0]) 
         classColorCondlist.append((str(0), condstr, rgblist[0]))
+       
     for i in xrange(1, lastindex):  #note that the last index is numbaskets
-        condstr = "([pixel] > " + str(quantilelist[i-1]) + \
-                  ") && ([pixel] <= " + str(quantilelist[i]) + ")"
+        condstr = "([pixel] > " + str(quantilelist[i-1]) + ") && ([pixel] <= " + str(quantilelist[i]) + ")"
         classColorCondlist.append((str(i), condstr, rgblist[i]))
-    condstr = "[pixel] > "+str(quantilelist[lastindex-1]) 
+
+    # handle the highest value and no max cases
+    if nomax and quantilelist[-1] != newMaxVal:
+        condstr = "([pixel] > "+str(quantilelist[lastindex-1]) + ") && ([pixel] <= " + str(newMaxVal) + ")"
+    else:
+        condstr = "[pixel] > "+str(quantilelist[lastindex-1])
     classColorCondlist.append((str(lastindex), condstr, rgblist[lastindex]))
+
     print classColorCondlist
     return classColorCondlist
 
