@@ -185,10 +185,10 @@ def get_shapefile(url, downloaddir='./Inputs', flag = 0):
             #print "test shapefolder" + shapefolder
             if flag == 0:
                 shapefolder = fname.split('.')[0]
-                print "test shapefolder" + shapefolder
+                #print "test shapefolder" + shapefolder
             else:
                 shapefolder = "nogrowth"
-                print "test shapefolder" + shapefolder
+                #print "test shapefolder" + shapefolder
             fname = '%s/%s/%s' %(downloaddir, shapefolder, fname)
 
             if fname.endswith('.shp'):
@@ -552,7 +552,7 @@ def main():
             runlog.h('Building Probability Maps..............')
             runMulticostModel(resultsdir, site, runlog)
             #hide cache function temporarily 
-            #cacheProbmaps(luc.growthmap[0]['url'])            
+            cacheProbmaps(luc.growthmap[0]['url'])            
 
     if luc.growthmap:
         runlog.h('Processing Growth Projection set........')
