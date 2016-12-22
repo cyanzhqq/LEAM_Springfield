@@ -45,12 +45,13 @@ OBJS = leam.o utilities.o luc.o SME.o bil.o spatial.o graph.o score.o GA.o http.
 
 gluc: $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
-	@echo gluc `Built ./gluc --version`
+	@echo gluc `./gluc --version`
+#@echo gluc `Build ./gluc --version`
 
 graph.o: graph.c graph.h
 
-clean:
-	-rm gluc *.o
+#clean:
+#	-rm gluc *.o
 
 tags: $(SRCS)
 	ctags $(SRCS)
